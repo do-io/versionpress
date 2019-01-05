@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Themes;
 
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class ThemesTest extends End2EndTestCase
@@ -19,10 +18,16 @@ class ThemesTest extends End2EndTestCase
     /** @var IThemesTestWorker */
     private static $worker;
 
+    private static $defaultTheme;
 
     public static function setupBeforeClass()
     {
         parent::setUpBeforeClass();
+
+        if (self::$testConfig->testSite->installationType !== 'standard') {
+            throw new \PHPUnit_Framework_SkippedTestSuiteError();
+        }
+
         $testDataPath = __DIR__ . '/../test-data';
         self::$themeInfo = [
             'zipfile' => realpath($testDataPath . '/test-theme.zip'),
@@ -40,6 +45,8 @@ class ThemesTest extends End2EndTestCase
 
         self::$worker->setThemeInfo(self::$themeInfo);
         self::$worker->setSecondThemeInfo(self::$secondThemeInfo);
+
+        self::$defaultTheme = self::$wpAutomation->getCurrentTheme();
     }
 
     /**
@@ -50,7 +57,7 @@ class ThemesTest extends End2EndTestCase
     {
         self::$worker->prepare_uploadTheme();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->uploadTheme();
 
@@ -69,9 +76,8 @@ class ThemesTest extends End2EndTestCase
     public function switchingThemeCreatesThemeSwitchAction()
     {
         self::$worker->prepare_switchTheme();
-        $currentTheme = self::$wpAutomation->getCurrentTheme();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->switchTheme();
 
@@ -81,8 +87,6 @@ class ThemesTest extends End2EndTestCase
         $commitAsserter->assertCommitPath(["A", "M"], "%vpdb%/options/cu/current_theme.ini");
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
-
-        self::$wpAutomation->switchTheme($currentTheme);
     }
 
     /**
@@ -91,9 +95,12 @@ class ThemesTest extends End2EndTestCase
      */
     public function deletingThemeCreatesThemeDeleteAction()
     {
+
+        self::$wpAutomation->switchTheme(self::$defaultTheme);
+
         self::$worker->prepare_deleteTheme();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteTheme();
 
@@ -112,7 +119,7 @@ class ThemesTest extends End2EndTestCase
     public function uploadingTwoThemesCreatesBulkAction()
     {
         self::$worker->prepare_uploadTwoThemes();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->uploadTwoThemes();
 
@@ -131,7 +138,7 @@ class ThemesTest extends End2EndTestCase
     public function deletingTwoThemesCreatesBulkAction()
     {
         self::$worker->prepare_deleteTwoThemes();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteTwoThemes();
 

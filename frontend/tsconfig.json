@@ -3,16 +3,19 @@
     "module": "commonjs",
     "sourceMap": true,
     "target": "es5",
-    "jsx": "react"
+    "jsx": "react",
+    "lib": ["es2016", "dom"],
+    "experimentalDecorators": true,
+    "strict": true,
+    "strictFunctionTypes": false,
+    "strictPropertyInitialization": false,
+    "typeRoots" : ["./node_modules/@types/"]
   },
-  "filesGlob": [
+  "include": [
     "src/**/*.ts",
-    "src/**/*.tsx",
-    "typings/typings.d.ts",
-    "!./node_modules/**/*.ts",
-    "!./node_modules/**/*.tsx"
+    "src/**/*.tsx"
   ],
-  "files": [
-    "typings/typings.d.ts"
+  "exclude": [
+    "src/**/__tests__/*.ts"
   ]
 }

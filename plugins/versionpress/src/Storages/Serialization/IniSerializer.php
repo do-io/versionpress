@@ -112,7 +112,7 @@ class IniSerializer
                     $output[] = self::serializeKeyValuePair($key . "[$arrayKey]", $arrayValue);
                 }
             } elseif (StringUtils::isSerializedValue($value)) {
-                $lines = SerializedDataToIniConverter::toIniLines($key, $value);
+                $lines = (new SerializedDataToIniConverter())->toIniLines($key, $value);
                 $output = array_merge($output, $lines);
             } else {
                 $output[] = self::serializeKeyValuePair($key, $value);
@@ -165,9 +165,9 @@ class IniSerializer
         $deserialized = parse_ini_string($string, true, INI_SCANNER_RAW);
         $deserialized = self::restoreTypesOfValues($deserialized);
         $deserialized = self::sanitizeSectionsAndKeys_removePlaceholders($deserialized);
+        $deserialized = self::eolWorkaround_removePlaceholders($deserialized);
         $deserialized = self::restorePhpSerializedData($deserialized);
         $deserialized = self::expandArrays($deserialized);
-        $deserialized = self::eolWorkaround_removePlaceholders($deserialized);
         return $deserialized;
     }
 
@@ -257,7 +257,6 @@ class IniSerializer
         }
 
         return $deserializedArray;
-
     }
 
     private static function getReplacedEolString($str, $direction)
@@ -272,19 +271,18 @@ class IniSerializer
         $to = ($direction == "charsToPlaceholders") ? array_values($replacement) : array_keys($replacement);
 
         return str_replace($from, $to, $str);
-
     }
 
 
     private static function outputToString($output)
     {
-        return implode("\r\n", $output);
+        return implode("\n", $output);
     }
 
     private static function preserveNumbers($iniString)
     {
-        // https://regex101.com/r/pH5hE9/2
-        $re = "/= \\d+(?:\\.\\d+)?\\r?\\n/m";
+        // https://regex101.com/r/pH5hE9/3
+        $re = "/= -?\\d+(?:\\.\\d+)?\\r?\\n/m";
         return preg_replace_callback($re, function ($m) {
             return str_replace('= ', '= ' . self::$numberMarker, $m[0]);
         }, $iniString);
@@ -445,7 +443,9 @@ class IniSerializer
     {
         $keysToRestore = [];
 
-        foreach ($deserialized as $key => $value) {
+        $reversed = array_reverse($deserialized);
+
+        foreach ($reversed as $key => $value) {
             if (is_array($value)) {
                 $deserialized[$key] = self::restorePhpSerializedData($value);
             } else {
@@ -465,7 +465,7 @@ class IniSerializer
             unset($keysToUnset[$key]);
 
             $deserialized = array_diff_key($deserialized, $keysToUnset);
-            $deserialized[$key] = SerializedDataToIniConverter::fromIniLines($key, $relatedKeys);
+            $deserialized[$key] = (new SerializedDataToIniConverter())->fromIniLines($key, $relatedKeys);
         }
 
         return $deserialized;

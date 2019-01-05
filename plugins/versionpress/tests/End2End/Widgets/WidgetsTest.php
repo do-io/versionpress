@@ -4,7 +4,6 @@ namespace VersionPress\Tests\End2End\Widgets;
 
 use Exception;
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 use VersionPress\Tests\Utils\WpVersionComparer;
 
@@ -33,7 +32,7 @@ class WidgetsTest extends End2EndTestCase
     {
         self::$worker->prepare_createWidget();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createWidget();
 
@@ -42,7 +41,7 @@ class WidgetsTest extends End2EndTestCase
         if (self::$testConfig->end2endTestType === 'selenium' &&
             WpVersionComparer::compare(self::$testConfig->testSite->wpVersion, '4.4-beta1') >= 0
         ) {
-            $commitAsserter->assertCommitAction('option/edit');
+            $commitAsserter->assertCommitAction('option/update');
             $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         } else {
             $commitAsserter->assertCommitAction('option/create');
@@ -63,12 +62,12 @@ class WidgetsTest extends End2EndTestCase
     {
         self::$worker->prepare_createWidget();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createWidget();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction('option/edit');
+        $commitAsserter->assertCommitAction('option/update');
         $commitAsserter->assertCountOfAffectedFiles(2);
         $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         $commitAsserter->assertCleanWorkingDirectory();
@@ -77,18 +76,18 @@ class WidgetsTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Editing widget creates 'option/edit' action.
+     * @testdox Editing widget creates 'option/update' action.
      */
     public function editingWidgetCreatesOptionEditAction()
     {
         self::$worker->prepare_editWidget();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editWidget();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction('option/edit');
+        $commitAsserter->assertCommitAction('option/update');
         $commitAsserter->assertCountOfAffectedFiles(1);
         $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         $commitAsserter->assertCleanWorkingDirectory();
@@ -97,18 +96,18 @@ class WidgetsTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Deleting widget creates 'option/edit' action
+     * @testdox Deleting widget creates 'option/update' action
      */
     public function deletingWidgetCreatesOptionEditAction()
     {
         self::$worker->prepare_deleteWidget();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteWidget();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction('option/edit');
+        $commitAsserter->assertCommitAction('option/update');
         $commitAsserter->assertCountOfAffectedFiles(2);
         $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         $commitAsserter->assertCleanWorkingDirectory();

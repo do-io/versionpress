@@ -21,7 +21,8 @@ class MergeDriverTest extends \PHPUnit_Framework_TestCase
 
     public static function setUpBeforeClass()
     {
-        self::$repositoryDir = __DIR__ . '/repository';
+        self::$repositoryDir = sys_get_temp_dir() . '/vp-repository';
+        mkdir(self::$repositoryDir);
     }
 
     public function setUp()
@@ -153,7 +154,6 @@ class MergeDriverTest extends \PHPUnit_Framework_TestCase
         MergeDriverTestUtils::commit('Commit to master');
 
         MergeAsserter::assertCleanMerge('git merge test-branch');
-
     }
 
 
@@ -190,10 +190,9 @@ class MergeDriverTest extends \PHPUnit_Framework_TestCase
 
         MergeAsserter::assertMergeConflict('git merge test-branch');
 
-        $expected = StringUtils::crlfize(file_get_contents(__DIR__ . '/expected-merge-conflict.ini'));
-        $actual = StringUtils::crlfize(file_get_contents(self::$repositoryDir . '/file.ini'));
+        $expected = StringUtils::ensureLf(file_get_contents(__DIR__ . '/expected-merge-conflict.ini'));
+        $actual = StringUtils::ensureLf(file_get_contents(self::$repositoryDir . '/file.ini'));
         $this->assertEquals($expected, $actual);
-
     }
 
 

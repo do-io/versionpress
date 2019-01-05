@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Posts;
 
 use VersionPress\Tests\End2End\Utils\PostTypeTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class PostsTest extends PostTypeTestCase
@@ -20,7 +19,7 @@ class PostsTest extends PostTypeTestCase
 
     /**
      * @test
-     * @testdox Updating post creates 'post/edit' action
+     * @testdox Updating post creates 'post/update' action
      *
      * @depends addingPostCreatesPostCreateAction
      */
@@ -31,7 +30,7 @@ class PostsTest extends PostTypeTestCase
 
     /**
      * @test
-     * @testdox Updating post via quick edit creates equivalent 'post/edit' action
+     * @testdox Updating post via quick edit creates equivalent 'post/update' action
      *
      * @depends updatingPostCreatesPostEditAction
      */
@@ -124,15 +123,14 @@ class PostsTest extends PostTypeTestCase
     {
         self::$worker->prepare_createTagInEditationForm();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createTagInEditationForm();
 
         $commitAsserter->assertNumCommits(2);
-        $commitAsserter->assertCommitAction('post/edit');
+        $commitAsserter->assertCommitAction('post/update');
         $commitAsserter->assertCommitAction('term/create', 1);
         $commitAsserter->assertCommitTag("VP-Post-Type", self::$worker->getPostType());
-        $commitAsserter->assertCommitTag("VP-Post-UpdatedProperties", "vp_term_taxonomy");
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
     }
@@ -164,16 +162,12 @@ class PostsTest extends PostTypeTestCase
     public function changingPostFormatUpdatesItsTaxonomy()
     {
         self::$worker->prepare_changePostFormat();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
         self::$worker->changePostFormat();
 
         $commitAsserter->ignoreCommits('term/create');
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction('post/edit');
-        $commitAsserter->assertCommitTag(
-            'VP-Post-UpdatedProperties',
-            'vp_term_taxonomy,post_modified,post_modified_gmt'
-        );
+        $commitAsserter->assertCommitAction('post/update');
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
     }
@@ -230,7 +224,7 @@ class PostsTest extends PostTypeTestCase
     public function deletingOfPostmetaCreatesPostmetaDeleteAction()
     {
         self::$worker->prepare_deletePostmeta();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
         self::$worker->deletePostmeta();
         $commitAsserter->assertNumCommits(1);
         $commitAsserter->assertCommitAction('postmeta/delete');

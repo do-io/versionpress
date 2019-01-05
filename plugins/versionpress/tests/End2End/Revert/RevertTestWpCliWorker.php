@@ -16,11 +16,13 @@ class RevertTestWpCliWorker extends WpCliWorker implements IRevertTestWorker
     public function __construct(TestConfig $testConfig)
     {
         parent::__construct($testConfig);
-        $this->repository = new GitRepository($this->testConfig->testSite->path);
+        $this->repository = new GitRepository($this->testConfig->testSite->path, sys_get_temp_dir());
     }
 
     public function prepare_undoLastCommit()
     {
+        // Creates two posts because `fresh_site` option could be saved together with the first one. It can be removed after #1254.
+        $this->createTestPost();
         $this->createTestPost();
         return [['D', '%vpdb%/posts/*']];
     }
@@ -186,11 +188,11 @@ class RevertTestWpCliWorker extends WpCliWorker implements IRevertTestWorker
 
     public function prepare_undoNonDbChange()
     {
-        $themeFile = 'wp-content/themes/twentyfifteen/header.php';
-        file_put_contents($this->testConfig->testSite->path . '/' . $themeFile, '');
-        $this->repository->stageAll($themeFile);
+        $newFile = 'vp-file.txt';
+        file_put_contents($this->testConfig->testSite->path . '/' . $newFile, '');
+        $this->repository->stageAll($newFile);
         $this->repository->commit('Manual commit', 'John Tester', 'john.tester@example.com');
-        return [['M', $themeFile]];
+        return [['D', $newFile]];
     }
 
     public function undoNonDbChange()

@@ -58,7 +58,7 @@ class MergeDriverInstaller
         $gitattributesContents = file_get_contents($pluginDir . '/src/Initialization/.gitattributes.tpl');
 
         $gitattributesVariables = [
-            'vpdb-dir' => rtrim(ltrim(PathUtils::getRelativePath($rootDir, $vpdbDir), '.'), '/\\')
+            'vpdb-dir' => PathUtils::getRelativePath($rootDir, $vpdbDir),
         ];
         $gitattributesContents = StringUtils::fillTemplateString($gitattributesVariables, $gitattributesContents);
 
@@ -94,7 +94,7 @@ class MergeDriverInstaller
         if ($driver == MergeDriverInstaller::DRIVER_BASH
             || ($driver == MergeDriverInstaller::DRIVER_AUTO && DIRECTORY_SEPARATOR == '/')) {
             $mergeDriverScript = $pluginDir . '/src/Git/merge-drivers/ini-merge.sh';
-            chmod($mergeDriverScript, 0750);
+            @chmod($mergeDriverScript, 0750); // Catching warning in case of read-only FS. However, it should already be 0750.
         }
 
         if ($driver == MergeDriverInstaller::DRIVER_PHP
@@ -119,7 +119,6 @@ class MergeDriverInstaller
 
         $gitconfigContents = StringUtils::fillTemplateString($gitconfigVariables, $gitconfigContents);
         file_put_contents($gitconfigPath, $gitconfigContents, FILE_APPEND);
-
     }
 
     /**
@@ -138,7 +137,7 @@ class MergeDriverInstaller
         $gitattributesContents = file_get_contents($pluginDir . '/src/Initialization/.gitattributes.tpl');
 
         $gitattributesVariables = [
-            'vpdb-dir' => rtrim(ltrim(PathUtils::getRelativePath($rootDir, $vpdbDir), '.'), '/\\')
+            'vpdb-dir' => PathUtils::getRelativePath($rootDir, $vpdbDir),
         ];
         $gitattributesContents = StringUtils::fillTemplateString($gitattributesVariables, $gitattributesContents);
 

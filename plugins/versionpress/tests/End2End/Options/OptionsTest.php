@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Options;
 
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class OptionsTest extends End2EndTestCase
@@ -14,18 +13,18 @@ class OptionsTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Changing option creates 'option/edit' action
+     * @testdox Changing option creates 'option/update' action
      */
     public function changingOptionCreatesOptionEditAction()
     {
         self::$worker->prepare_changeOption();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->changeOption();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction('option/edit');
+        $commitAsserter->assertCommitAction('option/update');
         $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
@@ -33,18 +32,18 @@ class OptionsTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Changing more option creates bulk 'option/edit' action
+     * @testdox Changing more option creates bulk 'option/update' action
      */
     public function changingMoreOptionsCreatesOptionEditAction()
     {
         self::$worker->prepare_changeTwoOptions();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->changeTwoOptions();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertBulkAction('option/edit', 2);
+        $commitAsserter->assertBulkAction('option/update', 2);
         $commitAsserter->assertCommitPath('M', '%vpdb%/options/%VPID%.ini');
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();

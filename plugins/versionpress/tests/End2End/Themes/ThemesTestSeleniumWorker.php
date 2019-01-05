@@ -21,11 +21,15 @@ class ThemesTestSeleniumWorker extends SeleniumWorker implements IThemesTestWork
 
     public function prepare_uploadTheme()
     {
-        $this->url('wp-admin/theme-install.php?upload');
+        $this->url(self::$wpAdminPath . '/theme-install.php?upload');
     }
 
     public function uploadTheme()
     {
+        if (version_compare(self::$testConfig->testSite->wpVersion, '4.6', '>=')) {
+            $this->byCssSelector('button.upload-view-toggle')->click();
+        }
+
         $this->byCssSelector('input[name=themezip]')->value(self::$themeInfo['zipfile']);
         $this->byCssSelector('#install-theme-submit')->click();
         $this->waitAfterRedirect();
@@ -33,7 +37,7 @@ class ThemesTestSeleniumWorker extends SeleniumWorker implements IThemesTestWork
 
     public function prepare_switchTheme()
     {
-        $this->url('wp-admin/themes.php');
+        $this->url(self::$wpAdminPath . '/themes.php');
     }
 
     public function switchTheme()
@@ -44,7 +48,7 @@ class ThemesTestSeleniumWorker extends SeleniumWorker implements IThemesTestWork
 
     public function prepare_deleteTheme()
     {
-        $this->url('wp-admin/themes.php');
+        $this->url(self::$wpAdminPath . '/themes.php');
     }
 
     public function deleteTheme()

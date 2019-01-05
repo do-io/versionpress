@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Users;
 
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class UsersTest extends End2EndTestCase
@@ -34,7 +33,7 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_createUser();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createUser();
 
@@ -48,19 +47,19 @@ class UsersTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Editing user's email creates 'user/edit' action
+     * @testdox Editing user's email creates 'user/update' action
      * @depends addingUserCreatesUserCreateAction
      */
     public function editingUserCreatesUserEditAction()
     {
         self::$worker->prepare_editUser();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editUser();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction("user/edit");
+        $commitAsserter->assertCommitAction("user/update");
         $commitAsserter->assertCommitTag("VP-User-Login", self::$testUser['login']);
         $commitAsserter->assertCommitPath("M", "%vpdb%/users/%VPID%.ini");
         $commitAsserter->assertCleanWorkingDirectory();
@@ -69,19 +68,19 @@ class UsersTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Editing user's name creates 'usermeta/edit' action
+     * @testdox Editing user's name creates 'usermeta/update' action
      * @depends addingUserCreatesUserCreateAction
      */
     public function editingUsermetaCreatesUsermetaEditAction()
     {
         self::$worker->prepare_editUsermeta();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editUsermeta();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction("usermeta/edit");
+        $commitAsserter->assertCommitAction("usermeta/update");
         $commitAsserter->assertCommitTag("VP-User-Login", self::$testUser['login']);
         $commitAsserter->assertCommitPath("M", "%vpdb%/users/%VPID(VP-User-Id)%.ini");
         $commitAsserter->assertCleanWorkingDirectory();
@@ -97,7 +96,7 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteUser();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteUser();
 
@@ -117,12 +116,12 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_editTwoUsers();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editTwoUsers();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertBulkAction("user/edit", 2);
+        $commitAsserter->assertBulkAction("user/update", 2);
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
     }
@@ -135,7 +134,7 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteTwoUsers();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteTwoUsers();
 
@@ -154,12 +153,12 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_editTwoUsermeta();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editTwoUsermeta();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertBulkAction("usermeta/edit", 2);
+        $commitAsserter->assertBulkAction("usermeta/update", 2);
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
     }
@@ -172,7 +171,7 @@ class UsersTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteUsermeta();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteUsermeta();
 

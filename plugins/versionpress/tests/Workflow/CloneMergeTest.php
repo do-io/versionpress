@@ -3,9 +3,11 @@
 namespace VersionPress\Tests\Workflow;
 
 use PHPUnit_Framework_TestCase;
+use VersionPress\Cli\VPCommandUtils;
 use VersionPress\Tests\Automation\WpAutomation;
 use VersionPress\Tests\Utils\SiteConfig;
 use VersionPress\Tests\Utils\TestConfig;
+use VersionPress\Utils\FileSystem;
 
 class CloneMergeTest extends PHPUnit_Framework_TestCase
 {
@@ -24,7 +26,6 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
         self::$siteConfig = self::$testConfig->testSite;
 
         self::$cloneSiteConfig = self::getCloneSiteConfig(self::$siteConfig);
-
     }
 
     /**
@@ -32,7 +33,20 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
      */
     public function cloneLooksExactlySameAsOriginal()
     {
-        $this->prepareSiteWithClone();
+        $siteConfig = self::$siteConfig;
+        $wpAutomation = new WpAutomation($siteConfig, self::$testConfig->wpCliVersion);
+        $wpAutomation->ensureTestSiteIsReady();
+
+        FileSystem::mkdir(self::$cloneSiteConfig->path);
+        chown(self::$cloneSiteConfig->path, 'www-data');
+        chgrp(self::$cloneSiteConfig->path, 'www-data');
+
+        $wpAutomation->runWpCliCommand('vp', 'clone', [
+            'name' => self::$cloneSiteConfig->name,
+            'dbprefix' => self::$cloneSiteConfig->dbTablePrefix,
+            'yes' => null
+        ]);
+
         $this->assertCloneLooksExactlySameAsOriginal();
     }
 
@@ -73,13 +87,12 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
      */
     public function dateModifiedMergesAutomatically()
     {
-        $cloneSiteConfig = self::$cloneSiteConfig;
         $internalCommandPath = __DIR__ . '/../../src/Cli/vp-internal.php';
 
         $wpAutomation = new WpAutomation(self::$siteConfig, self::$testConfig->wpCliVersion);
         $cloneWpAutomation = new WpAutomation(self::$cloneSiteConfig, self::$testConfig->wpCliVersion);
 
-        $this->prepareSite($wpAutomation);
+        $wpAutomation->ensureTestSiteIsReady();
 
         $post = [
             "post_type" => "page",
@@ -110,6 +123,9 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
             ['require' => $internalCommandPath, 'vpid' => $postVpId]
         );
         $cloneWpAutomation->editPost($clonedPostId, ['post_content' => 'Some new content']);
+
+        VPCommandUtils::exec('git config user.name test', self::$siteConfig->path);
+        VPCommandUtils::exec('git config user.email test@example.com', self::$siteConfig->path);
 
         $wpAutomation->runWpCliCommand('vp', 'pull', ['from' => self::$cloneSiteConfig->name]);
 
@@ -144,6 +160,9 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
         $wpAutomation = new WpAutomation(self::$siteConfig, self::$testConfig->wpCliVersion);
         $wpAutomation->editOption('blogname', 'Blogname from original - conflict');
 
+        VPCommandUtils::exec('sudo -u www-data git config user.name test', self::$siteConfig->path);
+        VPCommandUtils::exec('sudo -u www-data git config user.email test@example.com', self::$siteConfig->path);
+
         $output = $wpAutomation->runWpCliCommand('vp', 'pull', ['from' => self::$cloneSiteConfig->name]);
 
         $this->assertContains("Pull aborted", $output);
@@ -169,21 +188,6 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
         return $testSite;
     }
 
-    /**
-     * Creates site and its clone.
-     */
-    private function prepareSiteWithClone()
-    {
-        $siteConfig = self::$siteConfig;
-        $wpAutomation = new WpAutomation($siteConfig, self::$testConfig->wpCliVersion);
-        $this->prepareSite($wpAutomation);
-        $wpAutomation->runWpCliCommand('vp', 'clone', [
-            'name' => self::$cloneSiteConfig->name,
-            'dbprefix' => self::$cloneSiteConfig->dbTablePrefix,
-            'yes' => null
-        ]);
-    }
-
     private function getTextContentAtUrl($url)
     {
         $dom = new \DOMDocument();
@@ -206,18 +210,5 @@ class CloneMergeTest extends PHPUnit_Framework_TestCase
         );
 
         $this->assertEquals($origContent, $cloneContent);
-    }
-
-    /**
-     * @param WpAutomation $wpAutomation
-     */
-    private function prepareSite($wpAutomation)
-    {
-        $wpAutomation->setUpSite();
-        $wpAutomation->copyVersionPressFiles();
-        $wpAutomation->disableDebugger();
-
-        $wpAutomation->activateVersionPress();
-        $wpAutomation->initializeVersionPress();
     }
 }

@@ -10,26 +10,17 @@ use VersionPress\Utils\Process;
 use VersionPress\Utils\ProcessUtils;
 
 /**
- * Automates some common tasks like setting up a WP site, installing VersionPress, working with posts, comments etc.
+ * Helper functions around WP-CLI.
  *
- * You should have the whole development environment set up as described on our wiki. Specifically, these are required:
- *
- *  - WP-CLI (`wp --info` works in console)
- *  - NPM packages installed in <project_root>
- *  - Gulp (`gulp -v` works in console)
- *  - `test-config.yml` file created in `versionpress/tests`
- *
- * Currently, WpAutomation is a set of static functions as of v1; other options will be considered for v2, see WP-56.
- *
- * Note: Currently, the intention is to add supported tasks as public methods to this class. If this gets
- * unwieldy it will probably be split into multiple files / classes.
+ * NOTE: this class dates back to VersionPress 1.0 and contains some legacy approaches.
+ * For example, methods for manipulating WP site entities could be moved to tests.
  */
 class WpAutomation
 {
 
-
     /** @var SiteConfig */
     private $siteConfig;
+
     /** @var string */
     private $wpCliVersion;
 
@@ -43,25 +34,42 @@ class WpAutomation
         $this->wpCliVersion = $wpCliVersion;
     }
 
+    /**
+     * Makes sure that the test site is set-up and VersionPress fully activated.
+     */
+    public function ensureTestSiteIsReady()
+    {
+        if (!$this->isSiteSetUp()) {
+            $this->setUpSite();
+        }
+
+        if (!$this->isVersionPressInitialized()) {
+            $this->copyVersionPressFiles();
+            $this->initializeVersionPress();
+        }
+    }
 
     /**
-     * Does a full setup of a WP site including removing the old site,
-     * downloading files from wp.org, setting up a fresh database, executing
-     * the install script etc.
-     *
-     * Database as specified in the config file must exist and be accessible.
-     *
-     * It takes optional parameter entityCounts, that is an array containing
-     * an amount of generated entities - {@see populateSite}.
-     *
-     * @param array $entityCounts
+     * @param array $entityCounts {@see populateSite}
      */
     public function setUpSite($entityCounts = [])
     {
-        $this->prepareFiles();
-        $this->createConfigFile();
-        $this->clearDatabase();
-        $this->installWp();
+        if ($this->siteConfig->installationType === 'standard') {
+            $this->prepareStandardWpInstallation();
+        } elseif ($this->siteConfig->installationType === 'composer') {
+            $this->createPedestalBasedSite();
+        }
+
+        $this->runWpCliCommand('db', 'reset', [ 'yes' => null]);
+
+        $this->runWpCliCommand('core', 'install', [
+            'url' => $this->siteConfig->url,
+            'title' => $this->siteConfig->title,
+            'admin_user' => $this->siteConfig->adminUser,
+            'admin_email' => $this->siteConfig->adminEmail,
+            'admin_password' => $this->siteConfig->adminPassword,
+            'skip-email' => null,
+        ]);
 
         if (!$this->siteConfig->wpAutoupdate) {
             $this->disableAutoUpdate();
@@ -71,14 +79,12 @@ class WpAutomation
     }
 
     /**
-     * Returns true if the site is installed and working
-     *
      * @return bool
      */
     public function isSiteSetUp()
     {
         try {
-            $this->runWpCliCommand("core", "is-installed");
+            $this->runWpCliCommand('core', 'is-installed');
             return true;
         } catch (Exception $e) {
             return false;
@@ -92,24 +98,17 @@ class WpAutomation
      */
     public function isVersionPressInitialized()
     {
-        return is_file($this->siteConfig->path . '/wp-content/vpdb/.active');
+        $vpdbDir = $this->getVpdbDir();
+        return $vpdbDir && is_file($vpdbDir . '/.active');
     }
 
     /**
-     * Copies VP files to the test site and possibly removes all old files from there. It does so using
-     * a Gulp script which specifies which paths to include and which ones to ignore.
-     * See <project_root>\gulpfile.js.
+     * Copies development version of VersionPress to the test site. It currently also includes tests and dev dependencies
+     * which is not ideal but we can live with that.
      */
     public function copyVersionPressFiles()
     {
-        $versionPressDir = __DIR__ . '/../..';
-        $gulpBaseDir = $versionPressDir . '/../..'; // project root as checked out from our repository
-        $this->exec(
-            'gulp test-deploy',
-            $gulpBaseDir,
-            false,
-            ['VP_DEPLOY_TARGET' => $this->siteConfig->path]
-        ); // this also cleans the destination directory, see gulpfile.js "clean" task
+        FileSystem::copyDir(getenv('VP_DIR'), $this->siteConfig->path . '/wp-content/plugins/versionpress');
     }
 
     /**
@@ -118,7 +117,7 @@ class WpAutomation
      */
     public function activateVersionPress()
     {
-        $activateCommand = "wp plugin activate versionpress";
+        $activateCommand = 'wp plugin activate versionpress';
         $this->exec($activateCommand);
     }
 
@@ -472,7 +471,6 @@ class WpAutomation
      *
      * @param int $id
      * @param array $changes
-     * @return int
      */
     public function editMenuItem($id, $changes)
     {
@@ -506,7 +504,7 @@ class WpAutomation
     public function initializeVersionPress()
     {
         $this->runWpCliCommand('plugin', 'activate', ['versionpress']);
-        $this->runWpCliCommand('vp', 'activate');
+        $this->runWpCliCommand('vp', 'activate', ['yes' => null]);
     }
 
     /**
@@ -543,46 +541,19 @@ class WpAutomation
      * Puts WP directory to a default state, as if one manually downloaded the WordPress ZIP
      * and extracted it there. Removes all old files if necessary.
      */
-    private function prepareFiles()
+    private function prepareStandardWpInstallation()
     {
-        $this->ensureCleanInstallationIsAvailable();
-        FileSystem::removeContent($this->siteConfig->path);
-        FileSystem::copyDir($this->getCleanInstallationPath(), $this->siteConfig->path);
-    }
+        $this->runWpCliCommand(
+            'core',
+            'download',
+            array_merge([
+                'path' => $this->siteConfig->path,
+                'version' => $this->siteConfig->wpVersion,
+                'force' => null,
+            ], $this->siteConfig->wpLocale ? [ 'locale' => $this->siteConfig->wpLocale ] : [])
+        );
 
-    /**
-     * Ensures that the clean installation of WordPress is available locally. If not,
-     * downloads it from wp.org and stores it as `<clean-installations-dir>/<version>`.
-     */
-    private function ensureCleanInstallationIsAvailable()
-    {
-
-        if (!is_dir($this->getCleanInstallationPath())) {
-            $downloadPath = $this->getCleanInstallationPath();
-            FileSystem::mkdir($downloadPath);
-            $wpVersion = $this->siteConfig->wpVersion;
-            $wpLocale = $this->siteConfig->wpLocale;
-            $downloadCommand = "wp core download --path=\"$downloadPath\" --version=\"$wpVersion\"";
-            if ($wpLocale) {
-                $downloadCommand .= " --locale=$wpLocale";
-            }
-
-            $this->exec($downloadCommand, null);
-        }
-    }
-
-    /**
-     * Returns a path where a clean installation of the configured WP version is stored and cached.
-     *
-     * @return string
-     */
-    private function getCleanInstallationPath()
-    {
-
-        $homeDir = getenv('HOME') ?: getenv('HOMEDRIVE') . getenv('HOMEPATH');
-        $wpCliCacheDir = getenv('WP_CLI_CACHE_DIR') ?: "$homeDir/.wp-cli/cache";
-
-        return "$wpCliCacheDir/clean-installations/{$this->siteConfig->wpVersion}";
+        $this->createConfigFile();
     }
 
     /**
@@ -602,33 +573,10 @@ class WpAutomation
         }
 
         $args["skip-salts"] = null;
+        $args["skip-check"] = null;
+        $args["force"] = null;
 
         $this->runWpCliCommand("core", "config", $args);
-    }
-
-    /**
-     * Deletes all tables from the database.
-     */
-    private function clearDatabase()
-    {
-        $this->runWpCliCommand("db", "reset", ["yes" => null]);
-    }
-
-    /**
-     * Installs WordPress. Assumes that files have been prepared on the file system, database is clean
-     * and wp-config.php has been created.
-     */
-    private function installWp()
-    {
-        $cmdArgs = [
-            "url" => $this->siteConfig->url,
-            "title" => $this->siteConfig->title,
-            "admin_name" => $this->siteConfig->adminName,
-            "admin_email" => $this->siteConfig->adminEmail,
-            "admin_password" => $this->siteConfig->adminPassword
-        ];
-
-        $this->runWpCliCommand("core", "install", $cmdArgs);
     }
 
     /**
@@ -637,7 +585,6 @@ class WpAutomation
      * @param string $command
      * @param string $executionPath Working directory for the command. If null, the path will be determined
      *   automatically.
-     *
      * @param bool $debug
      * @param null|array $env
      * @return string When process execution is not successful
@@ -646,7 +593,7 @@ class WpAutomation
     private function exec($command, $executionPath = null, $debug = false, $env = null)
     {
 
-        $command = $this->rewriteWpCliCommand($command);
+        $command = $this->possiblyRewriteWpCliCommand($command);
 
         if (!$executionPath) {
             $executionPath = $this->siteConfig->path;
@@ -717,35 +664,29 @@ class WpAutomation
 
 
     /**
-     * Rewrites WP-CLI command to use a well-known binary and to possibly rewrite it for remote
-     * execution over SSH. If the command is not a WP-CLI command (doesn't start with "wp ..."),
-     * no rewriting is done.
+     * If the command starts "wp ", it rewrites it to a full format. No transformation
+     * is done for non-WP-CLI commands.
      *
      * @param string $command
-     * @param $autoSshTunnelling
+     *
      * @return string
      */
-    private function rewriteWpCliCommand($command)
+    private function possiblyRewriteWpCliCommand($command)
     {
-
         if (!Strings::startsWith($command, "wp ")) {
             return $command;
         }
 
         $command = substr($command, 3); // strip "wp " prefix
-
-        $command = "php " . escapeshellarg($this->getWpCli()) . " $command";
+        $command = "php " . ProcessUtils::escapeshellarg($this->getWpCli()) . " $command";
 
         return $command;
-
-
     }
 
     /**
      * Checks whether a WP-CLI binary is available, possibly downloads it and returns the path to it.
      *
-     * We use a custom WP-CLI PHAR (latest stable). The local custom binary
-     * is re-downloaded every day to keep it fresh (stable WP-CLI releases go out every couple of months).
+     * If "latest-stable" version is used, it is re-downloaded every day to keep it fresh.
      *
      * @return string The path to the custom WP-CLI PHAR.
      */
@@ -807,14 +748,83 @@ class WpAutomation
         );
     }
 
-    public function disableDebugger()
+    /**
+     * Creates project structure similar to Bedrock.
+     * Pedestal (https://github.com/versionpress/pedestal) is inpired by Bedrock. It only have
+     * a standard wp-config-based configuration system and predefined Composer scripts for VersionPress.
+     */
+    private function createPedestalBasedSite()
     {
-        $bootstrapFile = $this->siteConfig->path . '/wp-content/plugins/versionpress/bootstrap.php';
-        $lines = file($bootstrapFile);
-        $lines = array_filter($lines, function ($line) {
-            return !Strings::contains($line, "Debugger::enable(");
-        });
+        $process = new Process('composer create-project -s dev versionpress/pedestal .', $this->siteConfig->path);
+        $process->run();
 
-        file_put_contents($bootstrapFile, join("\n", $lines));
+        $this->updateConfigConstant('DB_NAME', $this->siteConfig->dbName);
+        $this->updateConfigConstant('DB_USER', $this->siteConfig->dbUser);
+        $this->updateConfigConstant('DB_PASSWORD', $this->siteConfig->dbPassword);
+        $this->updateConfigConstant('DB_HOST', $this->siteConfig->dbHost);
+        $this->updateConfigConstant('WP_HOME', $this->siteConfig->url);
+    }
+
+    private function updateConfigConstant($constant, $value)
+    {
+        $vpInternalCommandFile = __DIR__ . '/../../src/Cli/vp-internal.php';
+        $this->runWpCliCommand(
+            'vp-internal',
+            'update-config',
+            [$constant, $value, 'require' => $vpInternalCommandFile]
+        );
+    }
+
+    public function getVpdbDir()
+    {
+        return $this->runWpCliCommand('eval', null, ['defined("VP_VPDB_DIR") && print(VP_VPDB_DIR);']) ?: null;
+    }
+
+    public function getAbspath()
+    {
+        static $abspath = false;
+
+        if ($abspath === false) {
+            $abspath = $this->runWpCliCommand('eval', null, ['print(ABSPATH);']) ?: null;
+        }
+
+        return $abspath;
+    }
+
+    public function getUploadsDir()
+    {
+        static $uploads = false;
+
+        if ($uploads === false) {
+            $uploads = $this->runWpCliCommand('eval', null, ['print(wp_upload_dir()["basedir"]);']) ?: null;
+        }
+
+        return $uploads;
+    }
+
+    public function getPluginsDir()
+    {
+        static $pluginsDir = false;
+
+        if ($pluginsDir === false) {
+            $pluginsDir = $this->runWpCliCommand('eval', null, ['print(WP_PLUGIN_DIR);']) ?: null;
+        }
+
+        return $pluginsDir;
+    }
+
+    public function getWebRoot()
+    {
+        static $pluginsDir = false;
+
+        if ($pluginsDir === false) {
+            $pluginsDir = $this->runWpCliCommand(
+                'eval',
+                null,
+                ['print(dirname(\WP_CLI\Utils\locate_wp_config()));']
+            ) ?: null;
+        }
+
+        return $pluginsDir;
     }
 }

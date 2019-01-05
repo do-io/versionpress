@@ -14,7 +14,7 @@ class ChangeInfoUtils
 {
 
     /**
-     * Returns full action such as "post/edit" or "wordpress/update".
+     * Returns full action such as "post/update" or "plugin/activate".
      *
      * Note: changeinfo objects in production code don't have a need to represent
      * the concept of "full action"; tracked entities simply have entity names and actions.
@@ -26,7 +26,7 @@ class ChangeInfoUtils
     public static function getFullAction($changeInfo)
     {
         $actualChangeInfo = self::getTrackedChangeInfo($changeInfo);
-        return sprintf("%s/%s", $actualChangeInfo->getEntityName(), $actualChangeInfo->getAction());
+        return sprintf("%s/%s", $actualChangeInfo->getScope(), $actualChangeInfo->getAction());
     }
 
     /**
@@ -50,7 +50,7 @@ class ChangeInfoUtils
     {
         $actualChangeInfo = self::getTrackedChangeInfo($changeInfo);
         if ($actualChangeInfo instanceof EntityChangeInfo) {
-            return $actualChangeInfo->getEntityId();
+            return $actualChangeInfo->getId();
         } else {
             throw new \Exception("This method only work on EntityChangeInfo");
         }
@@ -87,7 +87,7 @@ class ChangeInfoUtils
             /** @var EntityChangeInfo $changeInfo1 */
             /** @var EntityChangeInfo $changeInfo2 */
 
-            if ($changeInfo1->getEntityId() !== $changeInfo2->getEntityId()) {
+            if ($changeInfo1->getId() !== $changeInfo2->getId()) {
                 return false;
             }
         }

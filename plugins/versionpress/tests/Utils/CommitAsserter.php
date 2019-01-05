@@ -5,30 +5,27 @@ namespace VersionPress\Tests\Utils;
 use Exception;
 use Nette\Utils\Strings;
 use PHPUnit_Framework_Assert;
+use VersionPress\Actions\ActionsInfoProvider;
 use VersionPress\ChangeInfos\BulkChangeInfo;
 use VersionPress\ChangeInfos\ChangeInfoEnvelope;
-use VersionPress\ChangeInfos\ChangeInfoMatcher;
+use VersionPress\ChangeInfos\CommitMessageParser;
 use VersionPress\ChangeInfos\TrackedChangeInfo;
 use VersionPress\ChangeInfos\UntrackedChangeInfo;
+use VersionPress\Database\DbSchemaInfo;
 use VersionPress\Git\Commit;
+use VersionPress\Git\GitRepository;
 
 /**
- * A short-lived object with lifespan of one test method that stores the most recent
- * commit on creation and then asserts that there were expected number of commits since then,
- * of certain type etc.
- *
- * Can be used from any type of tests (Selenium, WP-CLI, ...).
+ * A short-lived object that stores the current commit on its creation and then allows asserts
+ * like how many new commits have been created, what were their actions, etc.
  */
 class CommitAsserter
 {
 
-
-    /**
-     * When this object is created, a reference to most recent commit at that time
-     * is stored in this variable so that asserts can only work with the newly created commits.
-     * @var Commit
-     */
+    /** @var Commit */
     private $startCommit;
+
+    /** @var GitRepository */
     private $gitRepository;
 
     /**
@@ -48,20 +45,33 @@ class CommitAsserter
      */
     private $whichCommitParameter;
 
+    private $pathPlaceholders;
+    /** @var DbSchemaInfo */
+    private $dbSchema;
+    /** @var ActionsInfoProvider */
+    private $actionsInfoProvider;
+
     /**
      * Create CommitAsserter to start tracking the git repo for future asserts. Should generally
      * be called after a test setup (if there is any) and before all the actual work. Asserts follow
      * after it.
      *
      * @param \VersionPress\Git\GitRepository $gitRepository
+     * @param DbSchemaInfo $dbSchema
+     * @param ActionsInfoProvider $actionsInfoProvider
+     * @param string[] $pathPlaceholders
      */
-    public function __construct($gitRepository)
+    public function __construct($gitRepository, DbSchemaInfo $dbSchema, ActionsInfoProvider $actionsInfoProvider, $pathPlaceholders = [])
     {
         $this->gitRepository = $gitRepository;
-        $this->startCommit = $gitRepository->getCommit($gitRepository->getLastCommitHash());
+        $this->pathPlaceholders = $pathPlaceholders;
+        $this->dbSchema = $dbSchema;
+        $this->actionsInfoProvider = $actionsInfoProvider;
+
+        if ($gitRepository->isVersioned()) {
+            $this->startCommit = $gitRepository->getCommit($gitRepository->getLastCommitHash());
+        }
     }
-
-
 
     //---------------------------
     // Pre-assertion setup
@@ -74,11 +84,11 @@ class CommitAsserter
      *
      * This is useful in tests where different number of commits might be created in different circumstances.
      * For example, file upload will create two commits on first attempted upload ('post/create'
-     * and 'usermeta/edit') while it will only generate a single commit ('post/create') for repeated
-     * runs. In such case, if we only care about the 'post/create' action, 'usermeta/edit' can be set as ignored
+     * and 'usermeta/update') while it will only generate a single commit ('post/create') for repeated
+     * runs. In such case, if we only care about the 'post/create' action, 'usermeta/update' can be set as ignored
      * using this method.
      *
-     * @param string|string[] $action An action like "usermeta/edit", or an array of them
+     * @param string|string[] $action An action like "usermeta/update", or an array of them
      */
     public function ignoreCommits($action)
     {
@@ -110,13 +120,13 @@ class CommitAsserter
 
 
     /**
-     * Asserts that the recorded commit if of certain type, e.g. "post/edit". By default inspects
+     * Asserts that the recorded commit if of certain type, e.g. "post/update". By default inspects
      * the most recent commit; if this asserter captured more commits $whichCommit specifies
      * which commit to assert against.
      *
      * @see $whichCommitParameter
      *
-     * @param string $expectedAction Expected action, e.g., "post/edit" or "wordpress/update".
+     * @param string $expectedAction Expected action, e.g., "post/update" or "plugin/activate".
      * @param int $whichCommit See $whichCommitParameter documentation. "HEAD" by default.
      * @param bool $regardlessOfPriority By default, commit action must be the "main" one in the envelope
      *   (with the highest priority). If this param is set to true the whole envelope is searched for
@@ -149,7 +159,7 @@ class CommitAsserter
     /**
      * Asserts that commit is a bulk action. Asserts the action and number of grouped change info objects.
      *
-     * @param string $expectedAction Expected action, e.g., "post/edit" or "plugin/activate".
+     * @param string $expectedAction Expected action, e.g., "post/update" or "plugin/activate".
      * @param int $expectedCountOfGroupedActions
      */
     public function assertBulkAction($expectedAction, $expectedCountOfGroupedActions)
@@ -245,7 +255,7 @@ class CommitAsserter
      *
      * Placeholders are case sensitive.
      *
-     * @param string $type Standard git "M" (modified), "A" (added), "D" (deleted) etc.
+     * @param string|string[] $type Standard git "M" (modified), "A" (added), "D" (deleted) etc.
      *                     or array of actions for more possibilities.
      * @param string $path Path relative to repo root. Supports wildcards, e.g. "wp-content/uploads/*",
      *                     and placeholders, e.g., "%vpdb%/posts/%VPID%.ini"
@@ -374,7 +384,8 @@ class CommitAsserter
      */
     protected function getChangeInfo($commit)
     {
-        return ChangeInfoMatcher::buildChangeInfo($commit->getMessage());
+        $commitMessageParser = new CommitMessageParser($this->dbSchema, $this->actionsInfoProvider);
+        return $commitMessageParser->parse($commit->getMessage());
     }
 
 
@@ -404,8 +415,8 @@ class CommitAsserter
      */
     private function expandPath($path, $whichCommit)
     {
-        if (Strings::contains($path, "%vpdb%")) {
-            $path = str_replace("%vpdb%", "wp-content/vpdb", $path);
+        foreach ($this->pathPlaceholders as $placeholder => $value) {
+            $path = str_replace("%$placeholder%", $value, $path);
         }
 
         $containsVpId = Strings::contains($path, "%VPID%");

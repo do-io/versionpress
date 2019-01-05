@@ -1,16 +1,10 @@
-# IDEA project files
-/.idea
-
-# Build dirs
+# Build artifacts
 /build
-/node_modules
-
-# TypeScript definition files
-/typings/tsd
-/typings/tsd.d.ts
+/src/**/*.js
+/src/**/*.js.map
 
 # Local config files
-/src/config.local.ts
+/src/config/config.local.ts
 
 # Other
-tsd-debug.log
+/node_modules

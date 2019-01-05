@@ -1,16 +1,26 @@
-/// <reference path='../typings/typings.d.ts' />
-
-/* tslint:disable:variable-name no-unused-variable */
-
-import * as React from 'react';
-import * as DOM from 'react-dom';
-import * as ReactRouter from 'react-router';
-import { appRoute } from './routes';
-
 import 'core-js';
 
-const app = document.getElementById('vp');
+import * as React from 'react';
+import { render } from 'react-dom';
+import { HashRouter, Route } from 'react-router-dom';
+import { Provider } from 'mobx-react';
+import { hot } from 'react-hot-loader';
 
-ReactRouter.run(appRoute, ReactRouter.HashLocation, (Handler) => {
-  DOM.render(<Handler />, app);
-});
+import * as stores from './stores';
+
+import App from './components/app/App';
+
+declare const module: { hot: any };
+
+const HotComponent = (Component: any) => hot(module)(Component);
+
+const root = document.getElementById('vp');
+
+render(
+  <Provider {...stores}>
+    <HashRouter>
+      <Route component={HotComponent(App)} />
+    </HashRouter>
+  </Provider>,
+  root,
+);

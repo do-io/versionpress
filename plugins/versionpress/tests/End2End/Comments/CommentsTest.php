@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Comments;
 
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class CommentsTest extends End2EndTestCase
@@ -29,7 +28,7 @@ class CommentsTest extends End2EndTestCase
 
         self::$worker->prepare_createCommentAwaitingModeration();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createCommentAwaitingModeration();
 
@@ -49,7 +48,7 @@ class CommentsTest extends End2EndTestCase
 
         self::$worker->prepare_createSpamComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createSpamComment();
 
@@ -67,13 +66,13 @@ class CommentsTest extends End2EndTestCase
 
         self::$worker->prepare_createComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createComment();
 
         $commitAsserter->assertNumCommits(1);
         $commitAsserter->assertCommitAction("comment/create");
-        $commitAsserter->assertCommitTag("VP-Comment-Author", self::$testConfig->testSite->adminName);
+        $commitAsserter->assertCommitTag("VP-Comment-Author", self::$testConfig->testSite->adminUser);
         $commitAsserter->assertCommitPath("A", "%vpdb%/comments/%VPID%.ini");
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
@@ -81,20 +80,20 @@ class CommentsTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Editing comment creates 'comment/edit' action
+     * @testdox Editing comment creates 'comment/update' action
      * @depends addingCommentCreatesCommentCreateAction
      */
     public function editingCommentCreatesCommentEditAction()
     {
         self::$worker->prepare_editComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editComment();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction("comment/edit");
-        $commitAsserter->assertCommitTag("VP-Comment-Author", self::$testConfig->testSite->adminName);
+        $commitAsserter->assertCommitAction("comment/update");
+        $commitAsserter->assertCommitTag("VP-Comment-Author", self::$testConfig->testSite->adminUser);
         $commitAsserter->assertCommitPath("M", "%vpdb%/comments/%VPID%.ini");
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
@@ -109,7 +108,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_trashComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->trashComment();
 
@@ -129,7 +128,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_untrashComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->untrashComment();
 
@@ -149,7 +148,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteComment();
 
@@ -169,7 +168,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_unapproveComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->unapproveComment();
 
@@ -189,7 +188,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_approveComment();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->approveComment();
 
@@ -209,7 +208,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_markAsSpam();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->markAsSpam();
 
@@ -229,7 +228,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_markAsNotSpam();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->markAsNotSpam();
 
@@ -248,12 +247,12 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_editTwoComments();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editTwoComments();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertBulkAction('comment/edit', 2);
+        $commitAsserter->assertBulkAction('comment/update', 2);
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
     }
@@ -266,7 +265,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteTwoComments();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteTwoComments();
 
@@ -284,7 +283,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_moveTwoCommentsInTrash();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->moveTwoCommentsInTrash();
 
@@ -302,7 +301,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_moveTwoCommentsFromTrash();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->moveTwoCommentsFromTrash();
 
@@ -320,7 +319,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_markTwoCommentsAsSpam();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->markTwoCommentsAsSpam();
 
@@ -338,7 +337,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_markTwoSpamCommentsAsNotSpam();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->markTwoSpamCommentsAsNotSpam();
 
@@ -356,7 +355,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_unapproveTwoComments();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->unapproveTwoComments();
 
@@ -374,7 +373,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_approveTwoComments();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->approveTwoComments();
 
@@ -392,7 +391,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_commentmetaCreate();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->commentmetaCreate();
 
@@ -411,7 +410,7 @@ class CommentsTest extends End2EndTestCase
     {
         self::$worker->prepare_commentmetaDelete();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->commentmetaDelete();
 

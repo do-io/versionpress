@@ -1,8 +1,0 @@
-# TestConfig
-test-config.yml
-
-# Various PHPUnit reporting formats
-phpunit-log.*
-
-# WP-CLI config
-wp-cli.local.yml

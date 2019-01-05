@@ -23,7 +23,7 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
 
     public function prepare_installPlugin()
     {
-        $this->url('wp-admin/plugin-install.php?tab=upload');
+        $this->url(self::$wpAdminPath . '/plugin-install.php?tab=upload');
     }
 
     public function installPlugin()
@@ -35,23 +35,23 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
 
     public function prepare_activatePlugin()
     {
-        $this->url("wp-admin/plugins.php");
+        $this->url(self::$wpAdminPath . "/plugins.php");
     }
 
     public function activatePlugin()
     {
-        $this->byCssSelector(".activate a[href*='" .  self::$pluginInfo['url-fragment'] . "']")->click();
+        $this->byCssSelector(".activate a[href*='" . self::$pluginInfo['url-fragment'] . "']")->click();
         $this->waitAfterRedirect();
     }
 
     public function prepare_deactivatePlugin()
     {
-        $this->url("wp-admin/plugins.php");
+        $this->url(self::$wpAdminPath . "/plugins.php");
     }
 
     public function deactivatePlugin()
     {
-        $this->byCssSelector(".deactivate a[href*='" .  self::$pluginInfo['url-fragment'] . "']")->click();
+        $this->byCssSelector(".deactivate a[href*='" . self::$pluginInfo['url-fragment'] . "']")->click();
         $this->waitAfterRedirect();
     }
 
@@ -59,12 +59,18 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
     {
     }
 
-    public function deletePlugin() 
+    public function deletePlugin()
     {
-        $this->byCssSelector(".delete a[href*='" .  self::$pluginInfo['url-fragment'] . "']")->click();
-        $this->waitAfterRedirect();
-        $this->byCssSelector("#submit")->click();
-        $this->waitAfterRedirect();
+        $this->byCssSelector(".delete a[href*='" . self::$pluginInfo['url-fragment'] . "']")->click();
+
+        if ($this->isWpVersionLowerThan('4.6')) {
+            $this->waitAfterRedirect();
+            $this->byCssSelector("#submit")->click();
+            $this->waitAfterRedirect();
+        } else {
+            $this->acceptAlert();
+            $this->waitForAjax();
+        }
     }
 
     public function prepare_installTwoPlugins()
@@ -84,7 +90,7 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
             self::$secondPluginInfo['zipfile']
         );
         self::$wpAutomation->runWpCliCommand('plugin', 'install', [$plugin1Path, $plugin2Path]);
-        $this->url("wp-admin/plugins.php");
+        $this->url(self::$wpAdminPath . "/plugins.php");
     }
 
     public function activateTwoPlugins()
@@ -94,7 +100,7 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
 
     public function prepare_deactivateTwoPlugins()
     {
-        $this->url("wp-admin/plugins.php");
+        $this->url(self::$wpAdminPath . "/plugins.php");
     }
 
     public function deactivateTwoPlugins()
@@ -104,22 +110,27 @@ class PluginsTestSeleniumWorker extends SeleniumWorker implements IPluginsTestWo
 
     public function prepare_uninstallTwoPlugins()
     {
-        $this->url("wp-admin/plugins.php");
+        $this->url(self::$wpAdminPath . "/plugins.php");
     }
 
     public function uninstallTwoPlugins()
     {
         $this->performBulkAction('delete-selected');
-        $this->byId('submit')->click();
+        if ($this->isWpVersionLowerThan('4.7')) {
+            $this->byId('submit')->click();
+        } else {
+            $this->acceptAlert();
+            $this->waitForAjax();
+        }
     }
 
     private function performBulkAction($action)
     {
         // select two plugins
-        $this->byCssSelector('.check-column input[value*="' .  self::$pluginInfo['url-fragment'] . '"]')->click();
-        $this->byCssSelector('.check-column input[value*="' .  self::$secondPluginInfo['url-fragment'] . '"]')->click();
+        $this->byCssSelector('.check-column input[value*="' . self::$pluginInfo['url-fragment'] . '"]')->click();
+        $this->byCssSelector('.check-column input[value*="' . self::$secondPluginInfo['url-fragment'] . '"]')->click();
         // choose bulk edit
         $this->select($this->byId('bulk-action-selector-top'))->selectOptionByValue($action);
-        $this->jsClickAndWait('#doaction');
+        $this->byId('doaction')->click();
     }
 }

@@ -4,11 +4,12 @@ namespace VersionPress\Git;
 use VersionPress\ChangeInfos\ChangeInfo;
 use VersionPress\ChangeInfos\ChangeInfoEnvelope;
 use VersionPress\ChangeInfos\TrackedChangeInfo;
-use VersionPress\ChangeInfos\WordPressUpdateChangeInfo;
+use VersionPress\DI\VersionPressServices;
 use VersionPress\Git\ChangeInfoPreprocessors\ChangeInfoPreprocessor;
-use VersionPress\Git\ChangeInfoPreprocessors\EditActionChangeInfoPreprocessor;
+use VersionPress\Git\ChangeInfoPreprocessors\UpdateActionChangeInfoPreprocessor;
 use VersionPress\Git\ChangeInfoPreprocessors\PostChangeInfoPreprocessor;
 use VersionPress\Git\ChangeInfoPreprocessors\PostTermSplittingPreprocessor;
+use VersionPress\Git\ChangeInfoPreprocessors\TermTaxonomyPreprocessor;
 use VersionPress\Storages\Mirror;
 use VersionPress\Storages\StorageFactory;
 use VersionPress\Utils\FileSystem;
@@ -121,7 +122,7 @@ class Committer
 
         $mutex->release();
 
-        if (count($this->forcedChangeInfos) > 0 && $this->forcedChangeInfos[0] instanceof WordPressUpdateChangeInfo) {
+        if (count($this->forcedChangeInfos) > 0 && $this->forcedChangeInfos[0]->getScope() === 'wordpress') {
             FileSystem::remove(ABSPATH . 'versionpress.maintenance');
         }
 
@@ -136,16 +137,19 @@ class Committer
      */
     private function preprocessChangeInfoList($changeInfoList)
     {
+        global $versionPressContainer;
+
         $preprocessors = [
-            EditActionChangeInfoPreprocessor::class,
+            UpdateActionChangeInfoPreprocessor::class,
             PostChangeInfoPreprocessor::class,
             PostTermSplittingPreprocessor::class,
+            TermTaxonomyPreprocessor::class,
         ];
 
         $changeInfoLists = [$changeInfoList];
         foreach ($preprocessors as $preprocessorClass) {
             /** @var ChangeInfoPreprocessor $preprocessor */
-            $preprocessor = new $preprocessorClass();
+            $preprocessor = new $preprocessorClass($versionPressContainer->resolve(VersionPressServices::CHANGEINFO_FACTORY));
             $processedLists = [];
             foreach ($changeInfoLists as $changeInfoList) {
                 $processedLists = array_merge($processedLists, $preprocessor->process($changeInfoList));

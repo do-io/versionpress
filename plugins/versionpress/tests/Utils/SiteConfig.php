@@ -26,6 +26,14 @@ class SiteConfig
      */
     public $host;
 
+    /**
+     * Type of site - standard WP structure, Composer-based etc.
+     * Possible values: standard / composer
+     *
+     * @var string
+     */
+    public $installationType = 'standard';
+
 
     //----------------------
     // DB config
@@ -78,6 +86,11 @@ class SiteConfig
     public $url;
 
     /**
+     * @var string
+     */
+    public $wpAdminPath = 'wp-admin';
+
+    /**
      * Site title
      *
      * @var string
@@ -87,7 +100,7 @@ class SiteConfig
     /**
      * @var string
      */
-    public $adminName;
+    public $adminUser;
 
     /**
      * @var string

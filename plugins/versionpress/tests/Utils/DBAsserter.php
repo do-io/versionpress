@@ -6,6 +6,7 @@ use VersionPress\Database\Database;
 use VersionPress\Database\DbSchemaInfo;
 use VersionPress\Database\ShortcodesInfo;
 use VersionPress\Database\ShortcodesReplacer;
+use VersionPress\Database\TableSchemaStorage;
 use VersionPress\Database\VpidRepository;
 use VersionPress\DI\DIContainer;
 use VersionPress\Storages\StorageFactory;
@@ -32,58 +33,73 @@ class DBAsserter
     private static $shortcodesReplacer;
     /** @var VpidRepository */
     private static $vpidRepository;
+    /** @var WpAutomation */
+    private static $wpAutomation;
 
 
     public static function assertFilesEqualDatabase()
     {
-        self::staticInitialization();
+        HookMock::setUp(HookMock::TRUE_HOOKS);
+        self::setUp();
         $entityNames = self::$schemaInfo->getAllEntityNames();
         foreach ($entityNames as $entityName) {
             self::assertEntitiesEqualDatabase($entityName);
         }
         self::clearGlobalVariables();
+        HookMock::tearDown();
     }
 
-    private static function staticInitialization()
+    private static function setUp()
     {
-        self::$testConfig = TestConfig::createDefaultConfig();
+        // One-time initialization
+        if (!self::$testConfig) {
+            self::$testConfig = TestConfig::createDefaultConfig();
+            self::$wpAutomation = new WpAutomation(self::$testConfig->testSite, self::$testConfig->wpCliVersion);
 
-        $vpdbPath = self::$testConfig->testSite->path . '/wp-content/vpdb';
-        $schemaReflection = new \ReflectionClass(DbSchemaInfo::class);
-        $schemaFile = dirname($schemaReflection->getFileName()) . '/wordpress-schema.yml';
-        $shortcodeFile = dirname($schemaReflection->getFileName()) . '/wordpress-shortcodes.yml';
+            $dbHost = self::$testConfig->testSite->dbHost;
+            $dbUser = self::$testConfig->testSite->dbUser;
+            $dbPassword = self::$testConfig->testSite->dbPassword;
+            $dbName = self::$testConfig->testSite->dbName;
+            $dbPrefix = self::$testConfig->testSite->dbTablePrefix;
 
-        /** @var $wp_db_version */
-        require(self::$testConfig->testSite->path . '/wp-includes/version.php');
-
-        if (!function_exists('get_shortcode_regex')) {
-            require_once(self::$testConfig->testSite->path . '/wp-includes/shortcodes.php');
+            self::$database = new \mysqli($dbHost, $dbUser, $dbPassword, $dbName);
+            self::$wpdb = new \wpdb($dbUser, $dbPassword, $dbName, $dbHost);
+            self::$wpdb->set_prefix($dbPrefix);
+            self::$vp_database = new Database(self::$wpdb);
         }
 
-        self::$schemaInfo = new DbSchemaInfo($schemaFile, self::$testConfig->testSite->dbTablePrefix, $wp_db_version);
+        // The remaining probably needs to run before every `assertFilesEqualDatabase()`, otherwise tests are failing
+        // on storage having more entities than the database. This should be reviewed.
 
-        $wpAutomation = new WpAutomation(self::$testConfig->testSite, self::$testConfig->wpCliVersion);
-        $rawTaxonomies = $wpAutomation->runWpCliCommand(
+        $yamlDir = self::$wpAutomation->getPluginsDir() . '/versionpress/.versionpress';
+        $schemaFile = $yamlDir . '/schema.yml';
+        $shortcodeFile = $yamlDir . '/shortcodes.yml';
+
+        /** @var $wp_db_version */
+        require(self::$wpAutomation->getAbspath() . '/wp-includes/version.php');
+
+        if (!function_exists('get_shortcode_regex')) {
+            require_once(self::$wpAutomation->getAbspath() . '/wp-includes/shortcodes.php');
+        }
+
+        self::$schemaInfo = new DbSchemaInfo([$schemaFile], self::$testConfig->testSite->dbTablePrefix, $wp_db_version);
+
+        $rawTaxonomies = self::$wpAutomation->runWpCliCommand(
             'taxonomy',
             'list',
             ['format' => 'json', 'fields' => 'name']
         );
-        $taxonomies = ArrayUtils::column(json_decode($rawTaxonomies, true), 'name');
+        $taxonomies = array_column(json_decode($rawTaxonomies, true), 'name');
 
-        $dbHost = self::$testConfig->testSite->dbHost;
-        $dbUser = self::$testConfig->testSite->dbUser;
-        $dbPassword = self::$testConfig->testSite->dbPassword;
-        $dbName = self::$testConfig->testSite->dbName;
-        $dbPrefix = self::$testConfig->testSite->dbTablePrefix;
-        self::$database = new \mysqli($dbHost, $dbUser, $dbPassword, $dbName);
-        self::$wpdb = new \wpdb($dbUser, $dbPassword, $dbName, $dbHost);
-        self::$wpdb->set_prefix($dbPrefix);
-        self::$vp_database = new Database(self::$wpdb);
-        $shortcodesInfo = new ShortcodesInfo($shortcodeFile);
+        $shortcodesInfo = new ShortcodesInfo([$shortcodeFile]);
         self::$vpidRepository = new VpidRepository(self::$vp_database, self::$schemaInfo);
         self::$shortcodesReplacer = new ShortcodesReplacer($shortcodesInfo, self::$vpidRepository);
 
-        self::$storageFactory = new StorageFactory($vpdbPath, self::$schemaInfo, self::$vp_database, $taxonomies);
+        $vpdbPath = self::$wpAutomation->getVpdbDir();
+        $tableSchemaRepository = new TableSchemaStorage(self::$vp_database, $vpdbPath . '/.schema');
+        self::$storageFactory = new StorageFactory($vpdbPath, self::$schemaInfo, self::$vp_database, $taxonomies, null, $tableSchemaRepository);
+
+        require(self::$wpAutomation->getPluginsDir() . '/versionpress/.versionpress/hooks.php');
 
         self::defineGlobalVariables();
     }
@@ -232,6 +248,10 @@ class DBAsserter
     private static function fetchAll($query, $resultType = MYSQLI_ASSOC)
     {
         $res = self::$database->query($query);
+        if (!$res) {
+            return [];
+        }
+
         return $res->fetch_all($resultType);
     }
 
@@ -335,19 +355,28 @@ class DBAsserter
      */
     private static function defineGlobalVariables()
     {
-        global $versionPressContainer, $wpdb;
+        global $versionPressContainer, $wpdb, $wp_taxonomies;
 
         defined('VERSIONPRESS_PLUGIN_DIR') || define('VERSIONPRESS_PLUGIN_DIR', self::$testConfig->testSite->path .
             '/wp-content/plugins/versionpress');
         defined('VP_VPDB_DIR') || define('VP_VPDB_DIR', self::$testConfig->testSite->path . '/wp-content/vpdb');
         $versionPressContainer = DIContainer::getConfiguredInstance();
         $wpdb = self::$wpdb;
+
+        $rawTaxonomies = self::$wpAutomation->runWpCliCommand(
+            'taxonomy',
+            'list',
+            ['format' => 'json', 'fields' => 'name']
+        );
+        $taxonomies = array_column(json_decode($rawTaxonomies, true), 'name');
+        $wp_taxonomies = array_combine($taxonomies, $taxonomies);
     }
 
     private static function clearGlobalVariables()
     {
-        global $versionPressContainer, $wpdb;
+        global $versionPressContainer, $wpdb, $wp_taxonomies;
         $versionPressContainer = null;
         $wpdb = null;
+        $wp_taxonomies = null;
     }
 }

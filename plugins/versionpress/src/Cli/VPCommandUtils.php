@@ -4,6 +4,7 @@ namespace VersionPress\Cli;
 
 use cli\Colors;
 use VersionPress\Utils\Process;
+use VersionPress\Utils\ProcessUtils;
 use WP_CLI;
 
 class VPCommandUtils
@@ -11,7 +12,7 @@ class VPCommandUtils
     public static function runWpCliCommand($command, $subcommand, $args = [], $cwd = null)
     {
 
-        $cliCommand = "wp $command";
+        $cliCommand = VP_WP_CLI_BINARY . " $command";
 
         if ($subcommand) {
             $cliCommand .= " $subcommand";
@@ -19,14 +20,18 @@ class VPCommandUtils
 
         // Colorize the output
         if (defined('WP_CLI') && WP_CLI && \WP_CLI::get_runner()->in_color()) {
-            $args['color'] = null;
+            // All additional args need to be prepended, see #1279
+            $args = ['color' => null] + $args;
         }
+
+        // For commands that were run under root - #1049
+        $args = ['allow-root' => null] + $args;
 
         foreach ($args as $name => $value) {
             if (is_int($name)) { // positional argument
-                $cliCommand .= " " . escapeshellarg($value);
+                $cliCommand .= " " . ProcessUtils::escapeshellarg($value);
             } elseif ($value !== null) {
-                $cliCommand .= " --$name=" . escapeshellarg($value);
+                $cliCommand .= " --$name=" . ProcessUtils::escapeshellarg($value);
             } else {
                 $cliCommand .= " --$name";
             }

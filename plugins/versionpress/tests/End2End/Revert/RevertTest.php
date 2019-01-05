@@ -3,8 +3,8 @@
 namespace VersionPress\Tests\End2End\Revert;
 
 use VersionPress\Cli\VPCommandUtils;
+use VersionPress\Git\GitRepository;
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class RevertTest extends End2EndTestCase
@@ -21,7 +21,7 @@ class RevertTest extends End2EndTestCase
     {
         $changes = self::$worker->prepare_undoLastCommit();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoLastCommit();
 
@@ -40,7 +40,7 @@ class RevertTest extends End2EndTestCase
     public function undoRevertsOnlyOneCommit()
     {
         $changes = self::$worker->prepare_undoSecondCommit();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoSecondCommit();
 
@@ -60,7 +60,7 @@ class RevertTest extends End2EndTestCase
     {
         $changes = self::$worker->prepare_undoRevertedCommit();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoLastCommit();
         self::$worker->undoLastCommit();
@@ -81,7 +81,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_tryRestoreEntityWithMissingReference();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->tryRestoreEntityWithMissingReference();
         $commitAsserter->assertNumCommits(0);
@@ -97,7 +97,7 @@ class RevertTest extends End2EndTestCase
     {
         $changes = self::$worker->prepare_rollbackMoreChanges();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->rollbackMoreChanges();
         $commitAsserter->assertNumCommits(1);
@@ -116,7 +116,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_clickOnCancel();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->clickOnCancel();
 
@@ -133,7 +133,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_undoWithNotCleanWorkingDirectory();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
         touch(self::$testConfig->testSite->path . '/revert-test-file');
 
         self::$worker->undoLastCommit();
@@ -149,18 +149,21 @@ class RevertTest extends End2EndTestCase
      */
     public function rollbackWorksWithMergeCommits()
     {
-        $commitHash = $this->gitRepository->getLastCommitHash();
+        $gitRepository = new GitRepository(self::$testConfig->testSite->path);
+        $commitHash = $gitRepository->getLastCommitHash();
         $sitePath = self::$testConfig->testSite->path;
 
-        VPCommandUtils::exec('git branch test', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git branch test', $sitePath);
         self::$wpAutomation->createOption('vp_option_master', 'foo');
-        VPCommandUtils::exec('git checkout test', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git checkout test', $sitePath);
         self::$wpAutomation->createOption('vp_option_test', 'foo');
-        VPCommandUtils::exec('git checkout master', $sitePath);
-        VPCommandUtils::exec('git merge test', $sitePath);
-        VPCommandUtils::exec('git branch -d test', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git checkout master', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git config user.name test', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git config user.email test@example.com', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git merge test', $sitePath);
+        VPCommandUtils::exec('sudo -u www-data git branch -d test', $sitePath);
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$wpAutomation->runWpCliCommand('vp', 'rollback', [$commitHash]);
 
@@ -180,7 +183,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_undoToTheSameState();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoSecondCommit();
 
@@ -197,7 +200,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_rollbackToTheSameState();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->rollbackToTheSameState();
 
@@ -213,7 +216,7 @@ class RevertTest extends End2EndTestCase
     public function undoMultipleCommitsCreatesOneCommit()
     {
         $changes = self::$worker->prepare_undoMultipleCommits();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoMultipleCommits();
 
@@ -231,7 +234,7 @@ class RevertTest extends End2EndTestCase
     public function undoMultipleCommitsDetectsMissingReferencesCorrectly()
     {
         $changes = self::$worker->prepare_undoMultipleDependentCommits();
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoMultipleDependentCommits();
 
@@ -251,7 +254,7 @@ class RevertTest extends End2EndTestCase
     {
         self::$worker->prepare_undoMultipleCommitsThatCannotBeReverted();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoMultipleCommitsThatCannotBeReverted();
         $commitAsserter->assertNumCommits(0);
@@ -267,7 +270,7 @@ class RevertTest extends End2EndTestCase
     {
         $changes = self::$worker->prepare_undoNonDbChange();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->undoNonDbChange();
 

@@ -3,7 +3,6 @@
 namespace VersionPress\Tests\End2End\Menus;
 
 use VersionPress\Tests\End2End\Utils\End2EndTestCase;
-use VersionPress\Tests\Utils\CommitAsserter;
 use VersionPress\Tests\Utils\DBAsserter;
 
 class MenusTest extends End2EndTestCase
@@ -20,7 +19,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_createMenu();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createMenu();
 
@@ -41,7 +40,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_editMenu();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editMenu();
 
@@ -61,7 +60,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_addMenuItem();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->addMenuItem();
 
@@ -74,19 +73,19 @@ class MenusTest extends End2EndTestCase
 
     /**
      * @test
-     * @testdox Editing menu item order creates 'post/edit' action.
+     * @testdox Editing menu item order creates 'post/update' action.
      * @depends addingMenuItemCreatesPostCreateAction
      */
     public function editingMenuItemCreatesPostEditAction()
     {
         self::$worker->prepare_editMenuItem();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->editMenuItem();
 
         $commitAsserter->assertNumCommits(1);
-        $commitAsserter->assertCommitAction("post/edit");
+        $commitAsserter->assertCommitAction("post/update");
         $commitAsserter->assertCommitTag("VP-Post-Type", "nav_menu_item");
         $commitAsserter->assertCleanWorkingDirectory();
         DBAsserter::assertFilesEqualDatabase();
@@ -101,7 +100,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_createMenuItemDraft();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->createMenuItemDraft();
 
@@ -119,7 +118,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteOrphanedMenuItems();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteOrphanedMenuItems();
 
@@ -137,7 +136,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_removeMenuItem();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->removeMenuItem();
 
@@ -156,7 +155,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_removeMenuItemWithChildren();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->removeMenuItemWithChildren();
 
@@ -176,7 +175,7 @@ class MenusTest extends End2EndTestCase
     {
         self::$worker->prepare_deleteMenu();
 
-        $commitAsserter = new CommitAsserter($this->gitRepository);
+        $commitAsserter = $this->newCommitAsserter();
 
         self::$worker->deleteMenu();
 

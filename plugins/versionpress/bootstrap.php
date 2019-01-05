@@ -17,7 +17,7 @@ if (!defined('VP_VPDB_DIR')) {
 /**
  * Absolute path to the directory where VersionPress saves temporary data, e.g. mutex locks.
  */
-define('VERSIONPRESS_TEMP_DIR', VERSIONPRESS_PLUGIN_DIR . '/temp');
+define('VERSIONPRESS_TEMP_DIR', WP_CONTENT_DIR . '/vpcache');
 
 /**
  * Absolute path to the activation file.
@@ -36,6 +36,13 @@ if (!defined('VP_GIT_BINARY')) {
      * Absolute path to the git executable. Useful if it's not in PATH.
      */
     define('VP_GIT_BINARY', 'git');
+}
+
+if (!defined('VP_WP_CLI_BINARY')) {
+    /**
+     * Absolute path to the WP-CLI executable. Useful if it's not in PATH.
+     */
+    define('VP_WP_CLI_BINARY', 'wp');
 }
 
 if (!defined('VERSIONPRESS_GUI')) {
@@ -62,13 +69,15 @@ if (!defined('VERSIONPRESS_COMMIT_MESSAGE_PREFIX')) {
 }
 
 require_once(VERSIONPRESS_PLUGIN_DIR . '/vendor/autoload.php');
-require_once(VERSIONPRESS_PLUGIN_DIR . '/versionpress-functions.php');
+require_once(VERSIONPRESS_PLUGIN_DIR . '/internal-functions.php');
 
 if (defined('DOING_AJAX')) {
     $_SERVER['HTTP_X_REQUESTED_WITH'] = 'XMLHttpRequest';
 }
 
-Debugger::enable(Debugger::DEVELOPMENT, VERSIONPRESS_PLUGIN_DIR . '/log');
+if (defined('VP_DEBUG') && VP_DEBUG) {
+    Debugger::enable(Debugger::DEVELOPMENT, VERSIONPRESS_PLUGIN_DIR . '/log');
+}
 
 global $versionPressContainer;
 $versionPressContainer = DIContainer::getConfiguredInstance();
